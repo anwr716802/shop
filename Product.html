@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><?= product ? product.title : 'المنتج غير موجود' ?> | <?= siteName ?></title>
+  <meta name="description" content="<?= product ? product.description : 'صفحة تفاصيل المنتج' ?>">
+  <style>
+    :root{--bg:#0b0f14;--card:#121826;--muted:#9aa4b2;--text:#e5e7eb;--line:#233043;--brand:#22c55e}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;background:#0b0f14;color:var(--text)}
+    a{text-decoration:none;color:inherit} .wrap{max-width:1100px;margin:auto;padding:16px}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:8px 0 18px}
+    .box{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px}
+    .mainimg{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:18px;border:1px solid var(--line)}
+    .thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .thumb{width:76px;height:76px;object-fit:cover;border-radius:14px;border:1px solid var(--line);cursor:pointer}
+    .price{font-size:24px;font-weight:800;color:#86efac;margin:12px 0}
+    .muted{color:var(--muted)} .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#111827;border:1px solid #243244;color:#cbd5e1;font-size:12px;margin-left:6px}
+    @media (max-width: 900px){.box{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <a href="?"><strong>← العودة</strong></a>
+      <div class="muted"><?= siteName ?></div>
+    </div>
+
+    <? if (!product) { ?>
+      <div class="panel">المنتج غير موجود.</div>
+    <? } else { ?>
+      <div class="box">
+        <div class="panel">
+          <img id="mainImg" class="mainimg" src="<?= (product.images && product.images[0]) ? product.images[0] : 'https://picsum.photos/seed/empty/800/800' ?>" alt="<?= product.title ?>">
+          <div class="thumbs">
+            <? if (product.images && product.images.length) { ?>
+              <? for (var i = 0; i < product.images.length; i++) { ?>
+                <img class="thumb" src="<?= product.images[i] ?>" onclick="document.getElementById('mainImg').src=this.src">
+              <? } ?>
+            <? } ?>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div>
+            <span class="badge"><?= product.category ?></span>
+            <span class="badge"><?= product.gender ?></span>
+          </div>
+          <h1 style="margin:12px 0 8px"><?= product.title ?></h1>
+          <div class="price"><?= product.price ?> ريال</div>
+          <p class="muted" style="line-height:1.8"><?= product.description ?></p>
+        </div>
+      </div>
+
+      <script type="application/ld+json">
+      {
+        "@context":"https://schema.org",
+        "@type":"Product",
+        "name":"<?= product.title ?>",
+        "description":"<?= product.description ?>",
+        "image": <?= JSON.stringify(product.images || []) ?>,
+        "brand": { "@type":"Brand", "name":"<?= siteName ?>" },
+        "offers": {
+          "@type":"Offer",
+          "priceCurrency":"YER",
+          "price":"<?= product.price ?>"
+        }
+      }
+      </script>
+    <? } ?>
+  </div>
+</body>
+  </html>
