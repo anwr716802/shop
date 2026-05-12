@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><?= siteName ?> | كتالوج المنتجات</title>
+  <meta name="description" content="كتالوج متجر اكسسوارات رجالي ونسائي من تنفيذ مؤسسة الشعب - مارب.">
+  <style>
+    :root{--bg:#0b0f14;--card:#121826;--muted:#9aa4b2;--text:#e5e7eb;--line:#233043;--brand:#22c55e;--brand2:#60a5fa}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;background:linear-gradient(180deg,#081018,#0b0f14 50%,#070b10);color:var(--text)}
+    a{text-decoration:none;color:inherit} .wrap{max-width:1200px;margin:auto;padding:16px}
+    header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 0;position:sticky;top:0;background:rgba(11,15,20,.85);backdrop-filter:blur(10px);z-index:10}
+    .logo{font-weight:800;font-size:20px}.sub{color:var(--muted);font-size:13px}
+    .hero{padding:20px 0 10px}.hero h1{margin:0 0 8px;font-size:28px}.hero p{margin:0;color:var(--muted)}
+    .filters{display:grid;grid-template-columns:1.3fr .8fr .8fr .8fr;gap:10px;margin:18px 0}
+    input,select,button,textarea{width:100%;border:1px solid var(--line);background:#0f1621;color:var(--text);padding:12px 14px;border-radius:14px;outline:none}
+    button{cursor:pointer;background:linear-gradient(135deg,var(--brand),#16a34a);border:none;font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+    .img{aspect-ratio:1/1;background:#0d1320;display:block;width:100%;object-fit:cover}
+    .card .body{padding:14px}.price{font-weight:800;color:#86efac}.meta{color:var(--muted);font-size:13px;margin-top:6px}
+    .badge{display:inline-block;padding:6px 10px;border-radius:999px;background:#111827;border:1px solid #243244;color:#cbd5e1;font-size:12px;margin-left:6px}
+    .footer{padding:30px 0;color:var(--muted);text-align:center}
+    @media (max-width: 980px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{grid-template-columns:1fr 1fr}.hero h1{font-size:24px}}
+    @media (max-width: 560px){.grid{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.logo{font-size:18px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="logo"><?= siteName ?></div>
+        <div class="sub">كتالوج للمتاجر — اكسسوارات رجالي ونسائي</div>
+      </div>
+      <a href="?page=admin"><button style="width:auto;padding:10px 14px">لوحة التحكم</button></a>
+    </header>
+
+    <section class="hero">
+      <h1>عرض المنتجات بشكل سريع ومتوافق مع الجوال</h1>
+      <p>فلترة، بحث، وصفحات متعددة، وصور متعددة لكل منتج.</p>
+    </section>
+
+    <section class="filters">
+      <input id="q" placeholder="ابحث عن منتج..." oninput="render()">
+      <select id="category" onchange="render()"></select>
+      <select id="gender" onchange="render()">
+        <option value="">الكل</option>
+        <option value="رجالي">رجالي</option>
+        <option value="نسائي">نسائي</option>
+      </select>
+      <select id="sort" onchange="render()">
+        <option value="latest">الأحدث</option>
+        <option value="price-asc">السعر: الأقل</option>
+        <option value="price-desc">السعر: الأعلى</option>
+      </select>
+    </section>
+
+    <section id="count" class="sub" style="margin-bottom:12px"></section>
+    <section id="grid" class="grid"></section>
+
+    <div class="footer">تنفيذ: مؤسسة الشعب - مارب</div>
+  </div>
+
+  <script>
+    const PRODUCTS = <?= JSON.stringify(products || []) ?>;
+
+    const categoryEl = document.getElementById('category');
+    const grid = document.getElementById('grid');
+    const count = document.getElementById('count');
+
+    const categories = ['الكل', ...new Set(PRODUCTS.map(p => p.category).filter(Boolean))];
+    categoryEl.innerHTML = categories.map(c => `<option value="${c === 'الكل' ? '' : c}">${c}</option>`).join('');
+
+    function priceNum(v){ return Number(String(v || '').replace(/[^\d.]/g,'')) || 0; }
+    function esc(s){ return String(s || '').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+    function getFiltered() {
+      const q = document.getElementById('q').value.toLowerCase().trim();
+      const category = document.getElementById('category').value;
+      const gender = document.getElementById('gender').value;
+      const sort = document.getElementById('sort').value;
+
+      let items = [...PRODUCTS].filter(p => {
+        const okQ = !q || [p.title, p.description, p.category, p.gender].join(' ').toLowerCase().includes(q);
+        const okC = !category || p.category === category;
+        const okG = !gender || p.gender === gender;
+        return okQ && okC && okG;
+      });
+
+      if (sort === 'price-asc') items.sort((a,b) => priceNum(a.price) - priceNum(b.price));
+      if (sort === 'price-desc') items.sort((a,b) => priceNum(b.price) - priceNum(a.price));
+      if (sort === 'latest') items.sort((a,b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+
+      return items;
+    }
+
+    function render() {
+      const items = getFiltered();
+      count.textContent = `عدد المنتجات: ${items.length}`;
+
+      grid.innerHTML = items.map(p => {
+        const img = (p.images && p.images[0]) ? p.images[0] : 'https://picsum.photos/seed/empty/800/800';
+        return `
+          <a class="card" href="?page=product&id=${encodeURIComponent(p.id)}">
+            <img class="img" src="${esc(img)}" alt="${esc(p.title)}" loading="lazy">
+            <div class="body">
+              <div><span class="badge">${esc(p.category || 'بدون تصنيف')}</span><span class="badge">${esc(p.gender || '')}</span></div>
+              <h3 style="margin:10px 0 8px">${esc(p.title)}</h3>
+              <div class="price">${esc(p.price)} ريال</div>
+              <div class="meta">${esc((p.description || '').slice(0, 90))}${p.description && p.description.length > 90 ? '...' : ''}</div>
+            </div>
+          </a>
+        `;
+      }).join('') || '<div class="sub">لا توجد نتائج مطابقة.</div>';
+    }
+
+    render();
+  </script>
+  
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+</body>
+  </html>
