@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم | <?= siteName ?></title>
+  <style>
+    :root{--bg:#0b0f14;--card:#121826;--muted:#9aa4b2;--text:#e5e7eb;--line:#233043;--brand:#22c55e;--danger:#ef4444}
+    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;background:#0b0f14;color:var(--text)}
+    .wrap{max-width:1200px;margin:auto;padding:16px}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+    input,select,textarea,button{width:100%;border:1px solid var(--line);background:#0f1621;color:var(--text);padding:12px 14px;border-radius:14px;outline:none}
+    textarea{min-height:110px;resize:vertical}
+    button{cursor:pointer;border:none;font-weight:700}
+    .ok{background:linear-gradient(135deg,var(--brand),#16a34a)}
+    .danger{background:linear-gradient(135deg,var(--danger),#b91c1c)}
+    .muted{color:var(--muted)}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .item{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+    .thumb{width:90px;height:90px;object-fit:cover;border-radius:14px;border:1px solid var(--line)}
+    .hide{display:none}
+    .login{max-width:420px;margin:80px auto}
+    .previews{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .previews img{width:70px;height:70px;object-fit:cover;border-radius:12px;border:1px solid var(--line)}
+    @media (max-width: 900px){.grid,.grid3,.item{grid-template-columns:1fr}.item{gap:8px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel login" id="loginBox">
+      <h2>دخول لوحة التحكم</h2>
+      <p class="muted">أدخل كلمة المرور الخاصة بالإدارة.</p>
+      <input id="password" type="password" placeholder="كلمة المرور">
+      <div style="height:10px"></div>
+      <button class="ok" onclick="login()">دخول</button>
+      <div id="loginMsg" class="muted" style="margin-top:10px"></div>
+    </div>
+
+    <div id="dashboard" class="hide">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>
+            <h2 style="margin:0">لوحة التحكم</h2>
+            <div class="muted">إضافة وتعديل وحذف المنتجات</div>
+          </div>
+          <a href="?"><button style="width:auto;padding:10px 14px">عرض الموقع</button></a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin-top:0">إضافة / تعديل منتج</h3>
+        <input id="id" type="hidden">
+        <div class="grid3">
+          <input id="title" placeholder="اسم المنتج">
+          <input id="price" placeholder="السعر">
+          <select id="status">
+            <option value="active">نشط</option>
+            <option value="inactive">غير نشط</option>
+          </select>
+        </div>
+        <div class="grid3" style="margin-top:12px">
+          <input id="category" placeholder="التصنيف">
+          <select id="gender">
+            <option value="">النوع</option>
+            <option value="رجالي">رجالي</option>
+            <option value="نسائي">نسائي</option>
+          </select>
+          <input id="files" type="file" accept="image/*" multiple>
+        </div>
+        <div style="margin-top:12px">
+          <textarea id="description" placeholder="وصف المنتج"></textarea>
+        </div>
+        <div class="muted" style="margin-top:10px">الصور الحالية/المضافة:</div>
+        <div id="previews" class="previews"></div>
+        <div class="row" style="margin-top:12px">
+          <button class="ok" onclick="submitProduct()" style="flex:1">حفظ المنتج</button>
+          <button onclick="clearForm()" style="flex:1;background:#334155">تفريغ النموذج</button>
+          <button onclick="seed()" style="flex:1;background:#475569">إضافة منتجات افتراضية</button>
+        </div>
+        <div id="msg" class="muted" style="margin-top:10px"></div>
+      </div>
+
+      <div class="panel">
+        <h3 style="margin-top:0">المنتجات</h3>
+        <div id="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const CLOUDINARY_CLOUD_NAME = 'dxjzks7xl';
+    const CLOUDINARY_UPLOAD_PRESET = 'ضع_upload_preset_هنا';
+
+    let ADMIN_PASSWORD = '123456';
+    let PRODUCTS = [];
+
+    function gs(fn, ...args) {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(err => reject(err))
+          [fn](...args);
+      });
+    }
+
+    async function login() {
+      const password = document.getElementById('password').value.trim();
+      const msg = document.getElementById('loginMsg');
+      msg.textContent = 'جار التحقق...';
+      try {
+        const ok = await gs('checkAdmin', password);
+        if (!ok) throw new Error('كلمة المرور غير صحيحة');
+        ADMIN_PASSWORD = password;
+        document.getElementById('loginBox').classList.add('hide');
+        document.getElementById('dashboard').classList.remove('hide');
+        await loadProducts();
+      } catch (e) {
+        msg.textContent = e.message || 'فشل الدخول';
+      }
+    }
+
+    async function loadProducts() {
+      PRODUCTS = await gs('getAllProducts');
+      renderList();
+    }
+
+    function renderList() {
+      const list = document.getElementById('list');
+      if (!PRODUCTS.length) {
+        list.innerHTML = '<div class="muted">لا توجد منتجات.</div>';
+        return;
+      }
+      list.innerHTML = PRODUCTS.map(p => {
+        const img = (p.images && p.images[0]) ? p.images[0] : 'https://picsum.photos/seed/empty/200/200';
+        return `
+          <div class="item">
+            <img class="thumb" src="${img}" alt="">
+            <div>
+              <strong>${escapeHtml(p.title || '')}</strong>
+              <div class="muted">${escapeHtml(p.category || '')} — ${escapeHtml(p.gender || '')} — ${escapeHtml(p.price || '')} ريال</div>
+              <div class="muted">${escapeHtml((p.description || '').slice(0, 110))}</div>
+            </div>
+            <div class="row" style="justify-content:flex-end">
+              <button style="width:auto;padding:10px 12px;background:#334155" onclick='editProduct(${JSON.stringify(p).replace(/'/g,"&#39;")})'>تعديل</button>
+              <button style="width:auto;padding:10px 12px" class="danger" onclick="removeProduct('${p.id}')">حذف</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+    }
+
+    function clearForm() {
+      document.getElementById('id').value = '';
+      document.getElementById('title').value = '';
+      document.getElementById('price').value = '';
+      document.getElementById('category').value = '';
+      document.getElementById('gender').value = '';
+      document.getElementById('description').value = '';
+      document.getElementById('status').value = 'active';
+      document.getElementById('files').value = '';
+      document.getElementById('previews').innerHTML = '';
+      document.getElementById('msg').textContent = '';
+      window._currentImages = [];
+    }
+
+    function editProduct(p) {
+      document.getElementById('id').value = p.id || '';
+      document.getElementById('title').value = p.title || '';
+      document.getElementById('price').value = p.price || '';
+      document.getElementById('category').value = p.category || '';
+      document.getElementById('gender').value = p.gender || '';
+      document.getElementById('description').value = p.description || '';
+      document.getElementById('status').value = p.status || 'active';
+      window._currentImages = Array.isArray(p.images) ? p.images : [];
+      renderPreviews();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+
+    function renderPreviews() {
+      const box = document.getElementById('previews');
+      box.innerHTML = (window._currentImages || []).map(u => `<img src="${u}">`).join('');
+    }
+
+    async function uploadToCloudinary(file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+      const res = await fetch(url, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'فشل رفع الصورة');
+      return data.secure_url;
+    }
+
+    async function submitProduct() {
+      const msg = document.getElementById('msg');
+      try {
+        msg.textContent = 'جار حفظ البيانات...';
+
+        const files = Array.from(document.getElementById('files').files || []);
+        const newUrls = [];
+        for (const f of files) {
+          newUrls.push(await uploadToCloudinary(f));
+        }
+
+        const payload = {
+          id: document.getElementById('id').value.trim(),
+          title: document.getElementById('title').value.trim(),
+          price: document.getElementById('price').value.trim(),
+          category: document.getElementById('category').value.trim(),
+          gender: document.getElementById('gender').value.trim(),
+          description: document.getElementById('description').value.trim(),
+          status: document.getElementById('status').value,
+          images: [...(window._currentImages || []), ...newUrls],
+          password: ADMIN_PASSWORD
+        };
+
+        const result = await gs('saveProduct', payload);
+        msg.textContent = 'تم الحفظ بنجاح';
+        clearForm();
+        await loadProducts();
+      } catch (e) {
+        msg.textContent = e.message || 'حدث خطأ';
+      }
+    }
+
+    async function removeProduct(id) {
+      if (!confirm('حذف المنتج نهائيًا؟')) return;
+      try {
+        await gs('deleteProduct', id, ADMIN_PASSWORD);
+        await loadProducts();
+      } catch (e) {
+        alert(e.message || 'فشل الحذف');
+      }
+    }
+
+    async function seed() {
+      try {
+        await gs('seedProducts', ADMIN_PASSWORD);
+        await loadProducts();
+        alert('تمت الإضافة');
+      } catch (e) {
+        alert(e.message || 'فشل');
+      }
+    }
+  </script>
+  
+<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+<script>eruda.init();</script>
+</body>
+  </html>
